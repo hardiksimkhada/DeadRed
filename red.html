@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DEAD READ - Click and Survive!</title>
+<style>
+  body {
+    background: #222;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+    text-align: center;
+    user-select: none;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  h1 {
+    font-size: 4rem;
+    letter-spacing: 8px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #ffd500;
+  }
+  #menuScreen, #gameScreen {
+    width: 100%;
+  }
+  #menuScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #startBtn {
+    background: linear-gradient(135deg, #ffd500, #e6c200);
+    border: none;
+    border-radius: 12px;
+    color: #222;
+    font-size: 2.2rem;
+    font-weight: 700;
+    padding: 25px 60px;
+    box-shadow: 0 0 20px #ffd500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+  }
+  #startBtn:hover {
+    background: linear-gradient(135deg, #ffe347, #c7a400);
+    box-shadow: 0 0 30px #ffe347;
+  }
+  #gameGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 80px);
+    grid-gap: 18px;
+    justify-content: center;
+    margin: 20px auto 30px;
+  }
+  button.cell {
+    width: 80px;
+    height: 80px;
+    border: none;
+    border-radius: 14px;
+    background-color: #ffd500; /* yellow */
+    box-shadow: 0 0 12px #ffd500;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  button.cell.green {
+    background-color: #00cc44; /* green */
+    box-shadow: 0 0 20px #00cc44;
+  }
+  button.cell.red {
+    background-color: #ff4444; /* red */
+    box-shadow: 0 0 20px #ff4444;
+  }
+  button.cell:active {
+    filter: brightness(85%);
+  }
+  #scoreboard {
+    font-size: 1.8rem;
+    margin-top: 10px;
+  }
+  #message {
+    margin: 18px 0 8px;
+    height: 26px;
+    color: #ff4444;
+    font-weight: 700;
+    font-size: 1.2rem;
+    min-height: 30px;
+  }
+  #controls button {
+    background: #ffd500;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 28px;
+    margin: 12px 14px;
+    font-weight: 700;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #222;
+    box-shadow: 0 0 15px #ffd500;
+    transition: background-color 0.3s;
+  }
+  #controls button:hover {
+    background: #e6c200;
+  }
+</style>
+</head>
+<body>
+
+<h1>DEAD READ</h1>
+
+<div id="menuScreen">
+  <button id="startBtn">Start Game</button>
+</div>
+
+<div id="gameScreen" style="display:none;">
+  <div id="scoreboard">Score: 0 | Best: 0</div>
+  <div id="gameGrid"></div>
+  <div id="message"></div>
+  <div id="controls">
+    <button id="restartBtn">Restart</button>
+    <button id="menuBtn">Back to Menu</button>
+  </div>
+</div>
+
+<script>
+const gridSize = 16;
+let score = 0;
+let bestScore = localStorage.getItem('deadreadBestScore') || 0;
+let gameActive = false;
+let redChance = 0.20; // Start 20%
+
+const menuScreen = document.getElementById('menuScreen');
+const gameScreen = document.getElementById('gameScreen');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const menuBtn = document.getElementById('menuBtn');
+const scoreboard = document.getElementById('scoreboard');
+const gameGrid = document.getElementById('gameGrid');
+const message = document.getElementById('message');
+
+function updateScoreboard() {
+  scoreboard.textContent = `Score: ${score} | Best: ${bestScore}`;
+}
+
+function saveBestScore() {
+  if(score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('deadreadBestScore', bestScore);
+  }
+}
+
+function createGrid() {
+  gameGrid.innerHTML = '';
+  for(let i=0; i<gridSize; i++) {
+    const cell = document.createElement('button');
+    cell.classList.add('cell');
+    cell.dataset.state = 'yellow';
+    cell.addEventListener('click', () => {
+      if(!gameActive) return;
+      if(cell.dataset.state !== 'yellow') return;
+
+      const isRed = Math.random() < redChance;
+
+      if(isRed) {
+        cell.dataset.state = 'red';
+        cell.classList.remove('yellow');
+        cell.classList.add('red');
+        message.textContent = `Red clicked! Game Over! Final score: ${score}`;
+        saveBestScore();
+        updateScoreboard();
+        gameActive = false;
+        redChance = 0.20; // Reset difficulty on game over
+      } else {
+        cell.dataset.state = 'green';
+        cell.classList.remove('yellow');
+        cell.classList.add('green');
+        score++;
+        message.textContent = '';
+        updateScoreboard();
+
+        // Check if all yellow cells are done (green or red only left)
+        const remainingYellow = [...gameGrid.children].filter(c => c.dataset.state === 'yellow');
+        if(remainingYellow.length === 0) {
+          // Increase difficulty if player cleared all successfully
+          if(gameActive) {
+            redChance = Math.min(redChance + 0.05, 0.7);
+            message.textContent = `Level up! Difficulty increased! Red chance: ${(redChance*100).toFixed(0)}%`;
+            setTimeout(() => message.textContent = '', 2000);
+            createGrid();
+          }
+        }
+      }
+    });
+    gameGrid.appendChild(cell);
+  }
+}
+
+function startGame() {
+  score = 0;
+  redChance = 0.20; // reset difficulty on start
+  message.textContent = '';
+  gameActive = true;
+  updateScoreboard();
+  createGrid();
+  menuScreen.style.display = 'none';
+  gameScreen.style.display = 'block';
+}
+
+function restartGame() {
+  score = 0;
+  redChance = 0.20;
+  message.textContent = '';
+  gameActive = true;
+  updateScoreboard();
+  createGrid();
+}
+
+function backToMenu() {
+  gameActive = false;
+  message.textContent = '';
+  menuScreen.style.display = 'flex';
+  gameScreen.style.display = 'none';
+}
+
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', restartGame);
+menuBtn.addEventListener('click', backToMenu);
+
+updateScoreboard();
+</script>
+
+</body>
+</html>
